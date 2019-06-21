@@ -1,0 +1,164 @@
+import pandas as pd
+import numpy as np
+import matplotlib as plt
+%matplotlib inline
+import pylab as plot
+import seaborn as sns
+from sklearn.manifold import Isomap
+from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn import metrics
+from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
+from yellowbrick.classifier import ConfusionMatrix
+
+#Loading data
+df=pd.read_csv("E:\Qmul\Project\mushrooms.csv")
+df.head(10)
+df.dtypes
+df.shape
+
+#Checking for na values
+df.isna().sum()
+from sklearn.preprocessing import LabelEncoder
+labelencoder=LabelEncoder()
+for i in df.columns:
+    df[i]=labelencoder.fit_transform(df[i])
+df.head()[:4]
+
+#Finding the correlation of each features
+plot.figure(figsize=(15,8))
+sns.heatmap(df.corr(),annot=True,cmap='coolwarm')
+plot.show()
+sns.pairplot(df, palette='rainbow')
+var=df.groupby(['class']).sum().stack()
+temp=var.unstack()
+type(temp)
+x_list = temp['cap-color']
+label_list = temp.index
+plot.axis("equal") 
+plot.pie(x_list,labels=label_list,autopct="%1.1f%%")
+plot.title("Cap_color")
+plot.legend(["Class0","Class1"])
+plot.show()
+df['cap-shape'].value_counts().plot.bar()
+plot.xlabel('Cap_Shape')
+fig=plot.figure(figsize = (8,5))
+ax=fig.add_subplot(1,1,1)
+pd.value_counts(df['class']).plot(kind='bar', cmap = 'cool')
+plot.ylabel("Total")
+plot.xlabel("Class")
+plot.title('No. of poisonous/edible mushrooms)');
+
+X=df.drop(['class'], axis=1)
+Y=df['class']
+print(X.shape)
+print(Y.shape)
+
+#Check the Feature Importance
+# importance score for each attribute where the larger score the more important the attribute
+from sklearn.ensemble import ExtraTreesClassifier
+model = ExtraTreesClassifier()
+model.fit(X, Y)
+print(model.feature_importances_)
+
+#Splitting the data
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, Y, random_state=0,test_size=.2)
+
+#Normalising the data
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+#Logistic regression
+from sklearn.linear_model import LogisticRegression
+logistic = LogisticRegression()
+logistic.fit(X_train, y_train)
+print('Train Accuracy of Logistic regression classifier : {:.2f}'.format(logistic.score(X_train, y_train)))
+print('Test Accuracy of Logistic regression classifier : {:.2f}'.format(logistic.score(X_test, y_test)))
+y_pred=logistic.predict(X_test)
+print("Mean squared error: %.2f" % np.mean(logistic.predict(X_test) - y_test) ** 2)
+from sklearn.manifold import Isomap
+X_iso = Isomap(n_neighbors=10).fit_transform(X_train)
+lgr = logistic.predict(X_train)
+fig, ax = plot.subplots(1, 2, figsize=(8, 4))
+fig.suptitle('Predicted Versus Training Labels', fontsize=14, fontweight='bold')
+fig.subplots_adjust(top=0.85)
+ax[0].scatter(X_iso[:, 0], X_iso[:, 1], c=lgr,edgecolor='b')
+ax[0].set_title('Predicted Training Labels')
+ax[1].scatter(X_iso[:, 0], X_iso[:, 1], c=y_train,edgecolor='b')
+ax[1].set_title('Actual Training Labels')
+plot.show()
+
+#SVM
+from sklearn.svm import LinearSVC
+
+linear_svm = LinearSVC().fit(X_train, y_train)
+
+print('Train Accuracy of SVM classifier : {:.2f}'.format(linear_svm.score(X_train, y_train)))
+print('Test Accuracy of SVM classifier: {:.2f}'.format(linear_svm.score(X_test, y_test)))
+cm = ConfusionMatrix(linear_svm, classes=[0,1])
+cm.fit(X_train, y_train)
+cm.score(X_test, y_test)
+cm.poof()
+
+#KNN
+from sklearn.neighbors import KNeighborsClassifier
+training_accuracy = []
+test_accuracy = []
+# try n_neighbors from 1 to 10
+neighbours = range(1, 10)
+
+for n in neighbours:
+    knn = KNeighborsClassifier(n_neighbors=n)
+    knn.fit(X_train, y_train)
+    training_accuracy.append(knn.score(X_train, y_train))
+    test_accuracy.append(knn.score(X_test, y_test))
+    print('Accuracy of K-NN classifier : {:.2f}'.format(knn.score(X_test, y_test)))
+plot.plot(neighbours,training_accuracy, label="training accuracy")
+plot.plot(neighbours,test_accuracy, label="test accuracy")
+plot.ylabel("Accuracy")
+plot.xlabel("n_neighbors")
+plot.legend()
+y_pred = knn.predict(X_test)
+df_confusion = pd.crosstab(y_test, y_pred, rownames=['Actual'], colnames=['Predicted'])
+df_confusion
+
+#GaussianNB
+from sklearn.naive_bayes import GaussianNB
+
+GNB = GaussianNB()
+GNB = GNB.fit(X_train, y_train)
+y_pred_GNB=GNB.predict(X_test)
+print('Accuracy of GNB : {:.2f}'.format(linear_svm.score(X_train, y_train)))
+from yellowbrick.classifier import ClassificationReport
+visualizer = ClassificationReport(GNB, classes=["Class0","Class1"])
+
+visualizer.fit(X_train, y_train)  # Fit the training data to the visualizer
+visualizer.score(X_test, y_test)  # Evaluate the model on the test data
+g = visualizer.poof()  
+
+#Decision tree
+from sklearn.tree import DecisionTreeClassifier
+decision = DecisionTreeClassifier(max_depth=3).fit(X_train,y_train)
+print('Train Accuracy of Decision Tree classifier: {:.2f}'.format(decision.score(X_train, y_train)))
+print('Test Accuracy of Decision Tree classifier: {:.2f}'.format(decision.score(X_test, y_test)))
+from sklearn.metrics import classification_report
+print("Decision tree Classification report", classification_report(y_test, y_pred))
+cfm=confusion_matrix(y_test, y_pred)
+sns.heatmap(cfm, annot=True, linewidth=5, cbar=None)
+plot.title('Decision Tree Classifier confusion matrix')
+plot.ylabel('True label')
+plot.xlabel('predicted label')
+
+#PCA
+from sklearn.decomposition import PCA
+pca = PCA(n_components=20)
+X_train = pca.fit_transform(X_train)
+X_test = pca.transform(X_test)
+var=np.cumsum(np.round(pca.explained_variance_ratio_, decimals=4)*100)
+plt.pyplot.plot(var)
+print('Test Accuracy of Decision Tree classifier: {:.2f}'.format(pca.score(X_test, y_test)))
